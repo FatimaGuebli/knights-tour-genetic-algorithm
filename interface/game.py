@@ -1,4 +1,6 @@
 import pygame
+import os
+import glob
 import sys
 from typing import Tuple
 from .display import draw_button
@@ -31,6 +33,24 @@ def run_game(screen: pygame.Surface, clock: pygame.time.Clock, width: int = 1280
 
 	# basic animation state
 	t = 0.0
+
+	# Try to load an optional background image for the game screen. Prefer
+	# Load the explicitly named game background file `game_bg.jpg` only.
+	background_image = None
+	try:
+		base = os.path.dirname(__file__)
+		images_dir = os.path.join(base, "assets", "images")
+		path = os.path.join(images_dir, "game_bg.jpg")
+		if os.path.exists(path):
+			background_image = pygame.image.load(path).convert()
+			if hasattr(pygame.transform, 'smoothscale'):
+				background_image = pygame.transform.smoothscale(background_image, (width, height))
+			else:
+				background_image = pygame.transform.scale(background_image, (width, height))
+		else:
+			background_image = None
+	except Exception:
+		background_image = None
 	while running:
 		# handle events
 		for event in pygame.event.get():
@@ -47,8 +67,11 @@ def run_game(screen: pygame.Surface, clock: pygame.time.Clock, width: int = 1280
 		dt = clock.tick(60) / 1000.0
 		t += dt
 
-		# draw a simple placeholder game screen
-		screen.fill((18, 18, 24))
+		# draw a simple placeholder game screen (use background image if available)
+		if background_image is not None:
+			screen.blit(background_image, (0, 0))
+		else:
+			screen.fill((18, 18, 24))
 		# draw a large title
 		text = "Game Running - Knight's Tour"
 		if hasattr(title_font, 'render_to'):
