@@ -1,6 +1,6 @@
 import random
 from knight import Knight
-from chromosome import  chromosome
+from chromosome import Chromosome
 class Population:
 
   #init(population_size)  
@@ -73,3 +73,4 @@ class Population:
     # Remplace ancien population avec la nouvelle generer 
       self.knights = new_knights
       self.generation += 1    
+
