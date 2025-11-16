@@ -4,8 +4,7 @@ Running this file should open a Pygame window showing a static "Main Menu" heade
 Close the window manually to exit.
 """
 from interface import menu
-from population import Population
-from interface import menu, run_play 
+from interface.play import run_play
 from population import Population
 
 
