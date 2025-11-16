@@ -35,12 +35,54 @@ def draw_button(screen: pygame.Surface, rect: pygame.Rect, text: str, font, bg=(
     pygame versions (falls back when rounded rectangles are unsupported).
     """
     radius = min(rect.w, rect.h) // 8
-    try:
-        pygame.draw.rect(screen, bg, rect, border_radius=radius)
-    except TypeError:
-        pygame.draw.rect(screen, bg, rect)
 
-    # Render centered text
+    # Attempt to create a blurred copy of the area under the button and
+    # render a semi-transparent rounded rectangle on top so the button
+    # appears translucent with a blurred background. Fall back to a
+    # simple filled rect when the operations are not supported.
+    try:
+        # Capture area under button
+        sub = screen.subsurface(rect).copy()
+
+        # Quick blur via downscale/upsacle (simple box blur feel)
+        scale_w = max(1, rect.w // 4)
+        scale_h = max(1, rect.h // 4)
+        small = pygame.transform.smoothscale(sub, (scale_w, scale_h))
+        blurred = pygame.transform.smoothscale(small, (rect.w, rect.h))
+
+        # Create a mask for rounded corners (white inside rounded rect, transparent outside)
+        mask = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+        mask.fill((0, 0, 0, 0))
+        try:
+            pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=radius)
+        except TypeError:
+            pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect())
+
+        # Apply mask to blurred (multiply will zero-out outside rounded rect)
+        blurred.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+        # Create overlay: blurred background inside rounded rect + semi-transparent tint
+        overlay = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+        overlay.blit(blurred, (0, 0))
+
+        # Draw semi-transparent rounded rectangle tint on top
+        tint = (bg[0], bg[1], bg[2], 150)  # alpha ~150 for translucency
+        try:
+            pygame.draw.rect(overlay, tint, overlay.get_rect(), border_radius=radius)
+        except TypeError:
+            # older pygame: no rounded corners, draw normal rect
+            pygame.draw.rect(overlay, tint, overlay.get_rect())
+
+        # Blit the composed overlay onto the screen at the button position
+        screen.blit(overlay, rect.topleft)
+    except Exception:
+        # If any of the operations fail (subsurface, transform, etc.), fall back
+        try:
+            pygame.draw.rect(screen, bg, rect, border_radius=radius)
+        except TypeError:
+            pygame.draw.rect(screen, bg, rect)
+
+    # Render centered text (unchanged)
     if hasattr(font, "get_rect"):
         text_rect = font.get_rect(text)
         x = rect.x + rect.w // 2 - text_rect.width // 2

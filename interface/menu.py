@@ -4,6 +4,7 @@ import os
 import glob
 
 from .display import draw_background, render_text_center, render_text_at, draw_button
+from .play import run_play
 
 
 def _find_local_font():
@@ -39,12 +40,27 @@ def run_menu(width: int = 1280, height: int = 720) -> None:
     The window stays open until the user closes it manually.
     """
     pygame.init()
+    # Prepare soundtrack path early so it can be reused after returning from
+    # other screens even if mixer initialization fails initially.
+    base_sound = os.path.dirname(__file__)
+    sound_path = os.path.join(base_sound, "assets", "soundtrack", "Echoes of the Fallen.mp3")
+    # Try to find a play-mode soundtrack (prefer files mentioning 'mansion' or 'fate')
+    play_sound_path = None
+    try:
+        sound_dir = os.path.join(base_sound, "assets", "soundtrack")
+        if os.path.isdir(sound_dir):
+            for fname in os.listdir(sound_dir):
+                low = fname.lower()
+                if "mansion" in low or "fate" in low:
+                    play_sound_path = os.path.join(sound_dir, fname)
+                    break
+    except Exception:
+        play_sound_path = None
+
     # Initialize audio mixer and play menu soundtrack (if available).
     # Wrapped in try/except because mixer initialization can fail on some systems.
     try:
         pygame.mixer.init()
-        base_sound = os.path.dirname(__file__)
-        sound_path = os.path.join(base_sound, "assets", "soundtrack", "Echoes of the Fallen.mp3")
         if os.path.exists(sound_path):
             try:
                 pygame.mixer.music.load(sound_path)
@@ -159,7 +175,42 @@ def run_menu(width: int = 1280, height: int = 720) -> None:
                                 pygame.mixer.music.stop()
                             except Exception:
                                 pass
-                            message = "Play pressed (GA will start here)"
+                            # Try to play the play-mode soundtrack (if available)
+                            try:
+                                if play_sound_path and os.path.exists(play_sound_path):
+                                    try:
+                                        pygame.mixer.music.load(play_sound_path)
+                                        pygame.mixer.music.play(-1)
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
+                            # Transfer to the play page and return when done
+                            try:
+                                run_play(width, height)
+                                # When returning from the play screen, restart the
+                                # menu soundtrack if available.
+                                try:
+                                    # Stop any play-mode music, then reload menu music
+                                    try:
+                                        pygame.mixer.music.stop()
+                                    except Exception:
+                                        pass
+                                    if os.path.exists(sound_path):
+                                        try:
+                                            pygame.mixer.music.load(sound_path)
+                                            pygame.mixer.music.play(-1)
+                                        except Exception:
+                                            # If loading fails, try only play (may already be loaded)
+                                            try:
+                                                pygame.mixer.music.play(-1)
+                                            except Exception:
+                                                pass
+                                except Exception:
+                                    pass
+                            except Exception:
+                                # If play page fails, fall back to a message
+                                message = "Play pressed (GA will start here)"
                         elif b["text"] == "Settings":
                             message = "Settings pressed (open settings here)"
 
