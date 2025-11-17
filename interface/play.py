@@ -84,7 +84,8 @@ def run_play(width: int = 1280, height: int = 720) -> None:
 	algorithm_path = []
 	algorithm_index = 0
 	last_move_time = 0
-	move_delay_ms = 220
+	# milliseconds between moves; increase to slow down animation
+	move_delay_ms = 800
 	while running:
 		# Compute board drawing area (keeps square cells) at top so events
 		# can reference the positions/rects.
@@ -266,24 +267,51 @@ def run_play(width: int = 1280, height: int = 720) -> None:
 			list_scroll = max_row_scroll
 
 		# Compute available width for the left panel (space before board)
-		available_w = max(200, max(0, board_x - 32))
-		col_w = max(80, available_w // items_per_row)
+		available_w = max(120, max(0, board_x - 32))
+		# Measure the widest visible item to determine column width
+		max_text_w = 0
+		pad_x = 8
+		for rank, pos in positions_list:
+			text = f"{rank}: {pos}"
+			w, _h = list_font.size(text)
+			if w > max_text_w:
+				max_text_w = w
 
-		# Render visible rows (each row contains up to items_per_row entries)
+		# Compute how many columns fit into available_w
+		col_w = max_text_w + pad_x
+		if col_w <= 0:
+			col_w = 80
+		cols_fit = max(1, available_w // col_w)
+		# We cap columns to items_per_row (user request) but never exceed cols_fit
+		cols = min(items_per_row, cols_fit)
+		if cols <= 0:
+			cols = 1
+
+		# Recompute total rows with the number of columns we will render
+		rows_needed = (total_items + cols - 1) // cols if cols else 1
+		# Clamp scroll to the number of rows
+		max_row_scroll = max(0, rows_needed - visible_rows)
+		if list_scroll < 0:
+			list_scroll = 0
+		elif list_scroll > max_row_scroll:
+			list_scroll = max_row_scroll
+
+		# Render visible rows (each row contains up to cols entries)
 		for row_offset in range(visible_rows):
 			row = list_scroll + row_offset
-			for col in range(items_per_row):
-				idx = row * items_per_row + col
+			for col in range(cols):
+				idx = row * cols + col
 				if idx >= total_items:
 					break
 				rank, pos = positions_list[idx]
 				text = f"{rank}: {pos}"
 				surf = list_font.render(text, True, (200, 200, 200))
-				screen.blit(surf, (left_x + col * col_w, y_start + row_offset * line_h))
+				col_x = left_x + col * col_w
+				screen.blit(surf, (col_x, y_start + row_offset * line_h))
 
 		# If there are rows below the visible area, show a small indicator
-		if total_rows > visible_rows:
-			below = total_rows - (list_scroll + visible_rows)
+		if rows_needed > visible_rows:
+			below = rows_needed - (list_scroll + visible_rows)
 			if below > 0:
 				more = list_font.render(f"... +{below} more rows", True, (180, 180, 180))
 				screen.blit(more, (left_x, y_start + visible_rows * line_h))
